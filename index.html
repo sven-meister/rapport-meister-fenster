@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Meister Fenster AG – Montagerapport</title>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f0f0f0;
+    color: #333;
+    min-height: 100vh;
+  }
+
+  .screen-only {
+    display: flex;
+    justify-content: center;
+    padding: 30px 20px;
+  }
+
+  .card {
+    background: white;
+    width: 100%;
+    max-width: 820px;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  .rapport-header {
+    background: #fff;
+    padding: 28px 36px 20px;
+    border-bottom: 3px solid #4db848;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .rapport-header img {
+    height: 60px;
+    width: auto;
+    max-width: 280px; /* breiteres Logo */
+    background: #eee; /* Platzhalter, falls kein Logo */
+  }
+
+  .rapport-title {
+    text-align: right;
+  }
+
+  .rapport-title h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #555;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .rapport-title .subtitle {
+    font-size: 12px;
+    color: #999;
+    margin-top: 2px;
+  }
+
+  /* BODY */
+  .rapport-body {
+    padding: 28px 36px;
+  }
+
+  /* SECTION */
+  .section {
+    margin-bottom: 28px;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #4db848;
+    border-bottom: 1px solid #e8e8e8;
+    padding-bottom: 6px;
+    margin-bottom: 14px;
+  }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .col-span-2 { grid-column: span 2; }
+
+  /* FIELD */
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #777;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .field input,
+  .field textarea,
+  .field select {
+    width: 100%;
+    border: 1.5px solid #ddd;
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #333;
+    background: #fafafa;
+    transition: border-color 0.2s;
+    outline: none;
+    height: 40px;
+    line-height: normal;
+  }
+
+  .field textarea {
+    height: auto;
+    resize: vertical;
+    min-height: 90px;
+  }
+
+  /* Datum-Feld */
+  .field input[type="date"] {
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+    appearance: none;
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1.5px solid #ddd;
+    background: #fafafa;
+    font-size: 14px;
+    font-family: inherit;
+    box-sizing: border-box;
+    height: 40px;
+  }
+
+  .field input[type="date"]::-webkit-calendar-picker-indicator {
+    padding: 0;
+    margin: 0;
+  }
+
+  .field input:focus,
+  .field textarea:focus,
+  .field select:focus {
+    border-color: #4db848;
+    background: #fff;
+  }
+
+  /* STUNDEN TABELLE */
+  .stunden-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  .stunden-table th {
+    background: #f5f5f5;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #777;
+    border: 1px solid #e0e0e0;
+  }
+
+  .stunden-table td {
+    border: 1px solid #e0e0e0;
+    padding: 6px 8px;
+    vertical-align: middle;
+  }
+
+  .stunden-table td input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    padding: 2px 4px;
+    height: auto;
+  }
+
+  .stunden-table td input:focus {
+    background: #f0faf0;
+    border-radius: 3px;
+  }
+
+  .add-row-btn {
+    margin-top: 8px;
+    background: none;
+    border: 1.5px dashed #ccc;
+    color: #888;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .add-row-btn:hover {
+    border-color: #4db848;
+    color: #4db848;
+  }
+
+  .remove-row-btn {
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background: #fff;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .remove-row-btn:hover {
+    border-color: #e44;
+    color: #e44;
+  }
+
+  /* MATERIAL */
+  .material-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  .material-table th {
+    background: #f5f5f5;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #777;
+    border: 1px solid #e0e0e0;
+  }
+
+  .material-table td {
+    border: 1px solid #e0e0e0;
+    padding: 6px 8px;
+    vertical-align: middle;
+  }
+
+  .material-table td input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    padding: 2px 4px;
+    height: auto;
+  }
+
+  .material-table td input:focus {
+    background: #f0faf0;
+    border-radius: 3px;
+  }
+
+  /* UNTERSCHRIFT */
+  .sig-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .sig-box label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  .sig-canvas-wrapper {
+    border: 1.5px solid #ddd;
+    border-radius: 6px;
+    background: #fafafa;
+    position: relative;
+    height: 120px;
+  }
+
+  .sig-canvas-wrapper canvas {
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    border-radius: 6px;
+  }
+
+  .clear-sig {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 11px;
+    color: #aaa;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+  }
+
+  .clear-sig:hover { color: #e44; }
+
+  /* FOTOS */
+  .foto-upload-area {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    background: #fafafa;
+  }
+
+  .foto-upload-area:hover { border-color: #4db848; }
+
+  .foto-upload-area input { display: none; }
+
+  .foto-upload-area p { color: #888; font-size: 13px; margin-top: 8px; }
+
+  .foto-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .foto-preview-item {
+    position: relative;
+    width: 90px;
+    height: 90px;
+  }
+
+  .foto-preview-item img {
+    width: 90px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+  }
+
+  .foto-preview-item .remove-foto {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #e44;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    line-height: 20px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* FOOTER ACTIONS */
+  .rapport-actions {
+    padding: 20px 36px 28px;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    border-top: 1px solid #eee;
+  }
+
+  .btn {
+    padding: 11px 28px;
+    border-radius: 7px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-outline {
+    background: white;
+    border: 1.5px solid #ddd;
+    color: #555;
+  }
+
+  .btn-outline:hover { border-color: #999; }
+
+  .btn-primary {
+    background: #4db848;
+    color: white;
+  }
+
+  .btn-primary:hover { background: #3da038; }
+
+  /* ==== TABLET ==== */
+  @media (min-width: 601px) and (max-width: 900px) {
+    .card {
+      max-width: 700px;
+    }
+    .grid-3 {
+      grid-template-columns: 1fr 1fr;
+    }
+    .grid-2 {
+      grid-template-columns: 1fr 1fr;
+    }
+    .section {
+      margin-bottom: 22px;
+    }
+  }
+
+  /* ==== MOBILE ==== */
+  @media (max-width: 600px) {
+    body {
+      font-size: 16px;
+    }
+
+    .screen-only {
+      padding: 10px;
+    }
+
+    .card {
+      border-radius: 0;
+      box-shadow: none;
+      max-width: 100%;
+    }
+
+    .rapport-header {
+      padding: 16px 18px 12px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .rapport-header img {
+      height: 40px;
+      max-width: 160px;
+    }
+
+    .rapport-title {
+      text-align: left;
+    }
+
+    .rapport-title h1 {
+      font-size: 18px;
+    }
+
+    .rapport-body {
+      padding: 16px 18px;
+    }
+
+    .section {
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    .field label {
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .field input,
+    .field textarea,
+    .field select {
+      font-size: 15px;
+      padding: 10px 12px;
+    }
+
+    .grid-2,
+    .grid-3 {
+      display: block;
+    }
+
+    .grid-2 .field,
+    .grid-3 .field {
+      margin-bottom: 12px;
+    }
+
+    .sig-area {
+      display: block;
+    }
+
+    .sig-box {
+      margin-bottom: 16px;
+    }
+  }
+
+  /* ===== PRINT / PDF ===== */
+  @media print {
+    body { background: white; }
+
+    .screen-only { padding: 0; display: block; }
+
+    .card {
+      box-shadow: none;
+      border-radius: 0;
+      max-width: 100%;
+    }
+
+    .rapport-actions { display: none; }
+    .add-row-btn { display: none; }
+    .clear-sig { display: none; }
+    .foto-upload-area > p { display: none; }
+    .remove-row-btn { display: none; }
+
+    .field input,
+    .field textarea,
+    .field select {
+      border: none;
+      border-bottom: 1px solid #bbb;
+      border-radius: 0;
+      background: transparent;
+      padding: 4px 2px;
+      height: auto;
+    }
+
+    .sig-canvas-wrapper {
+      background: transparent;
+    }
+
+    .section { break-inside: avoid; }
+
+    .rapport-header { border-bottom: 3px solid #4db848; }
+  }
+</style>
+</head>
+<body>
+
+<div class="screen-only">
+<div class="card">
+
+  <!-- HEADER -->
+  <div class="rapport-header">
+    <img id="logo-img" src="LOGO.png" alt="Meister Fenster AG Logo">
+    <div class="rapport-title">
+      <h1>Montagerapport</h1>
+      <div class="subtitle">Meister Fenster AG · Matzendorf</div>
+    </div>
+  </div>
+
+  <div class="rapport-body">
+
+    <!-- AUFTRAGSDATEN -->
+    <div class="section">
+      <div class="section-title">Auftragsdaten</div>
+      <div class="grid-3">
+        <div class="field">
+          <label>Datum</label>
+          <input type="date" id="datum">
+        </div>
+        <div class="field">
+          <label>Auftragsnummer</label>
+          <input type="text" placeholder="z.B. A-2024-0123">
+        </div>
+        <div class="field">
+          <label>Arbeiter / Monteur</label>
+          <input type="text" placeholder="Name des Monteurs">
+        </div>
+      </div>
+    </div>
+
+    <!-- KUNDE / BAUSTELLE -->
+    <div class="section">
+      <div class="section-title">Kunde &amp; Baustelle</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Kundenname</label>
+          <input type="text" placeholder="Vor- und Nachname">
+        </div>
+        <div class="field">
+          <label>Telefon Kunde</label>
+          <input type="tel" placeholder="+41 79 000 00 00">
+        </div>
+        <div class="field col-span-2">
+          <label>Adresse Baustelle</label>
+          <input type="text" placeholder="Strasse, PLZ Ort">
+        </div>
+      </div>
+    </div>
+
+    <!-- GELEISTETE ARBEIT -->
+    <div class="section">
+      <div class="section-title">Geleistete Arbeit</div>
+      <div class="field">
+        <label>Beschreibung der Arbeiten</label>
+        <textarea placeholder="Was wurde heute gemacht? (z.B. Montage Holzfenster EG links, Abdichtung Leibung, Einstellung Beschläge...)"></textarea>
+      </div>
+    </div>
+
+    <!-- STUNDEN -->
+    <div class="section">
+      <div class="section-title">Arbeitsstunden</div>
+      <table class="stunden-table">
+        <thead>
+          <tr>
+            <th style="width:30%">Mitarbeiter</th>
+            <th style="width:18%">Von</th>
+            <th style="width:18%">Bis</th>
+            <th style="width:24%">Total Stunden</th>
+            <th style="width:10%">Aktion</th>
+          </tr>
+        </thead>
+        <tbody id="stunden-tbody">
+          <tr>
+            <td><input type="text" placeholder="Name"></td>
+            <td><input type="time"></td>
+            <td><input type="time"></td>
+            <td><input type="text" placeholder="z.B. 8.5 h"></td>
+            <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <button class="add-row-btn" type="button" onclick="addStundenRow()">+ Zeile hinzufügen</button>
+    </div>
+
+    <!-- MATERIAL -->
+    <div class="section">
+      <div class="section-title">Material &amp; Verbrauch</div>
+      <table class="material-table">
+        <thead>
+          <tr>
+            <th style="width:46%">Bezeichnung</th>
+            <th style="width:20%">Menge</th>
+            <th style="width:24%">Einheit / Bemerkung</th>
+            <th style="width:10%">Aktion</th>
+          </tr>
+        </thead>
+        <tbody id="material-tbody">
+          <tr>
+            <td><input type="text" placeholder="Material / Artikel"></td>
+            <td><input type="number" placeholder="0"></td>
+            <td><input type="text" placeholder="Stk / m / kg …"></td>
+            <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
+          </tr>
+          <tr>
+            <td><input type="text" placeholder="Material / Artikel"></td>
+            <td><input type="number" placeholder="0"></td>
+            <td><input type="text" placeholder="Stk / m / kg …"></td>
+            <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <button class="add-row-btn" type="button" onclick="addMaterialRow()">+ Zeile hinzufügen</button>
+    </div>
+
+    <!-- BEMERKUNGEN -->
+    <div class="section">
+      <div class="section-title">Bemerkungen / Nächste Schritte</div>
+      <div class="field">
+        <label>Zusätzliche Hinweise</label>
+        <textarea placeholder="Offene Punkte, Mängel, Folgetermine..."></textarea>
+      </div>
+    </div>
+
+    <!-- FOTOS -->
+    <div class="section">
+      <div class="section-title">Fotos</div>
+      <div class="foto-upload-area" onclick="document.getElementById('foto-input').click()">
+        <input type="file" id="foto-input" accept="image/*" multiple onchange="handleFotos(event)">
+        <svg width="32" height="32" fill="none" stroke="#ccc" stroke-width="1.5" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <path d="M21 15l-5-5L5 21"/>
+        </svg>
+        <p>Fotos hier tippen / klicken um hochzuladen</p>
+      </div>
+      <div class="foto-preview" id="foto-preview"></div>
+    </div>
+
+    <!-- UNTERSCHRIFTEN -->
+    <div class="section">
+      <div class="section-title">Unterschriften</div>
+      <div class="sig-area">
+        <div class="sig-box">
+          <label>Monteur</label>
+          <div class="sig-canvas-wrapper">
+            <canvas id="sig-monteur"></canvas>
+            <button class="clear-sig" type="button" onclick="clearSig('sig-monteur')">✕ löschen</button>
+          </div>
+        </div>
+        <div class="sig-box">
+          <label>Kunde / Bauherrschaft</label>
+          <div class="sig-canvas-wrapper">
+            <canvas id="sig-kunde"></canvas>
+            <button class="clear-sig" type="button" onclick="clearSig('sig-kunde')">✕ löschen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /rapport-body -->
+
+  <!-- ACTIONS -->
+  <div class="rapport-actions">
+    <button class="btn btn-outline" type="button" onclick="resetForm()">Formular leeren</button>
+    <button class="btn btn-primary" type="button" onclick="window.print()">📄 Als PDF exportieren</button>
+  </div>
+
+</div><!-- /card -->
+</div><!-- /screen-only -->
+
+<script>
+  // Canvas-Größen initialisieren
+  document.addEventListener('DOMContentLoaded', () => {
+    ['sig-monteur', 'sig-kunde'].forEach(id => {
+      const canvas = document.getElementById(id);
+      if (canvas) {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+      }
+    });
+  });
+
+  // Signatur-Zeichnen (Maus + Touch)
+  document.addEventListener('DOMContentLoaded', () => {
+    const canvases = ['sig-monteur', 'sig-kunde'];
+
+    canvases.forEach(id => {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      let drawing = false;
+      let lastX = 0;
+      let lastY = 0;
+
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        let x, y;
+        if (e.touches && e.touches.length > 0) {
+          x = e.touches[0].clientX - rect.left;
+          y = e.touches[0].clientY - rect.top;
+        } else {
+          x = e.clientX - rect.left;
+          y = e.clientY - rect.top;
+        }
+        return { x, y };
+      }
+
+      function startDraw(e) {
+        e.preventDefault();
+        const pos = getPos(e);
+        drawing = true;
+        lastX = pos.x;
+        lastY = pos.y;
+      }
+
+      function draw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        lastX = pos.x;
+        lastY = pos.y;
+      }
+
+      function endDraw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        drawing = false;
+      }
+
+      canvas.addEventListener('mousedown', startDraw);
+      canvas.addEventListener('mousemove', draw);
+      canvas.addEventListener('mouseup', endDraw);
+      canvas.addEventListener('mouseleave', endDraw);
+
+      canvas.addEventListener('touchstart', startDraw, { passive: false });
+      canvas.addEventListener('touchmove', draw, { passive: false });
+      canvas.addEventListener('touchend', endDraw, { passive: false });
+      canvas.addEventListener('touchcancel', endDraw, { passive: false });
+    });
+  });
+
+  // Zeile entfernen (Stunden & Material)
+  function removeRow(button) {
+    const tr = button.closest('tr');
+    if (tr) tr.remove();
+  }
+
+  // Arbeitsstunden-Zeile hinzufügen
+  function addStundenRow() {
+    const tbody = document.getElementById('stunden-tbody');
+    if (!tbody) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" placeholder="Name"></td>
+      <td><input type="time"></td>
+      <td><input type="time"></td>
+      <td><input type="text" placeholder="z.B. 8.5 h"></td>
+      <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // Material-Zeile hinzufügen
+  function addMaterialRow() {
+    const tbody = document.getElementById('material-tbody');
+    if (!tbody) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" placeholder="Material / Artikel"></td>
+      <td><input type="number" placeholder="0"></td>
+      <td><input type="text" placeholder="Stk / m / kg …"></td>
+      <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // Fotos verarbeiten & Vorschau anzeigen
+  function handleFotos(event) {
+    const files = event.target.files;
+    const preview = document.getElementById('foto-preview');
+    if (!preview || !files) return;
+
+    preview.innerHTML = '';
+
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const div = document.createElement('div');
+        div.className = 'foto-preview-item';
+        div.innerHTML = `
+          <img src="${e.target.result}" alt="Foto">
+          <button class="remove-foto" type="button" onclick="this.parentNode.remove()">×</button>
+        `;
+        preview.appendChild(div);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Signatur-Canvas leeren
+  function clearSig(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Formular zurücksetzen
+  function resetForm() {
+    document.querySelectorAll('input, textarea').forEach(el => {
+      const type = el.type;
+      if (type === 'file') {
+        el.value = '';
+      } else if (type !== 'button' && type !== 'submit' && type !== 'reset') {
+        el.value = '';
+      }
+    });
+
+    const preview = document.getElementById('foto-preview');
+    if (preview) preview.innerHTML = '';
+
+    clearSig('sig-monteur');
+    clearSig('sig-kunde');
+  }
+</script>
+
+</body>
+</html>
