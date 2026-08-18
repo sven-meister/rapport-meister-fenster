@@ -1385,6 +1385,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
     try {
       const card = document.querySelector('.card');
+
+      // Blöcke ermitteln, die beim Seitenumbruch nicht zerschnitten werden dürfen
+      // (Kopfbereich + jede Rapport-Sektion), Position relativ zur Kartenoberkante
+      const blockEls = [
+        document.querySelector('.rapport-header'),
+        ...document.querySelectorAll('.rapport-body > .section')
+      ].filter(Boolean);
+
+      const cardRectBefore = card.getBoundingClientRect();
+      const cardHeightPx = cardRectBefore.height;
+      const blockBottomsPx = blockEls.map(el => el.getBoundingClientRect().bottom - cardRectBefore.top);
+
       const canvas = await html2canvas(card, {
         scale: 2,
         useCORS: true,
@@ -1397,18 +1409,51 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       const pageHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = pageWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+      const pxPerMm = canvas.height / imgHeight;
 
-      let heightLeft = imgHeight;
-      let position = 0;
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      // Umrechnung DOM-Pixel → mm im fertigen Bild, um die Block-Grenzen
+      // als mögliche (bevorzugte) Seitenumbruch-Punkte nutzen zu können
+      const mmPerPx = imgHeight / cardHeightPx;
+      const breakPointsMm = blockBottomsPx
+        .map(px => px * mmPerPx)
+        .filter(mm => mm > 0 && mm <= imgHeight);
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      let pageStart = 0;
+      let firstPage = true;
+
+      while (pageStart < imgHeight - 0.5) {
+        const maxEnd = Math.min(pageStart + pageHeight, imgHeight);
+        let breakAt = maxEnd;
+
+        if (maxEnd < imgHeight - 0.5) {
+          const candidates = breakPointsMm.filter(mm => mm > pageStart + 5 && mm <= maxEnd);
+          if (candidates.length > 0) {
+            breakAt = candidates[candidates.length - 1];
+          }
+          // Falls kein Block dazwischenpasst (Block größer als eine Seite),
+          // wird als Rückfallebene an der Seitenkante geschnitten.
+        }
+
+        // Nur den tatsächlich zu dieser Seite gehörenden Bildausschnitt zuschneiden,
+        // statt das Gesamtbild zu verschieben – sonst "blutet" der nächste Abschnitt
+        // in die Restfläche der Seite hinein.
+        const sliceHeightMm = breakAt - pageStart;
+        const sliceStartPx = Math.round(pageStart * pxPerMm);
+        const sliceHeightPx = Math.max(1, Math.round(sliceHeightMm * pxPerMm));
+
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceHeightPx;
+        const sctx = sliceCanvas.getContext('2d');
+        sctx.fillStyle = '#ffffff';
+        sctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        sctx.drawImage(canvas, 0, sliceStartPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
+
+        if (!firstPage) pdf.addPage();
+        firstPage = false;
+        pdf.addImage(sliceData, 'JPEG', 0, 0, imgWidth, sliceHeightMm);
+        pageStart = breakAt;
       }
 
       const datum = document.getElementById('datum').value || new Date().toISOString().slice(0, 10);
