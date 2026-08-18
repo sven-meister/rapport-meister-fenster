@@ -1522,6 +1522,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     document.body.classList.remove('pdf-export-mode');
 
     const file = new File([blob], filename, { type: 'application/pdf' });
+    const photoFiles = await collectPhotoFiles();
+    const shareFiles = [file, ...photoFiles];
 
     const downloadInstead = (hint) => {
       const url = URL.createObjectURL(blob);
@@ -1541,7 +1543,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       btn.disabled = false;
     };
 
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (navigator.canShare && navigator.canShare({ files: shareFiles })) {
       // Fertig – jetzt auf den zweiten, frischen Tap warten, der das Teilen-Menü
       // ohne jede Verzögerung direkt auslöst.
       btn.textContent = '📤 Jetzt zum Teilen antippen';
@@ -1550,7 +1552,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         btn.disabled = true;
         try {
           await navigator.share({
-            files: [file],
+            files: shareFiles,
             title: 'Montagerapport',
             text: `Montagerapport vom ${datum}${kunde ? ' – ' + kunde : ''}`
           });
@@ -1565,10 +1567,50 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           }
         }
       };
+    } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      // Fotos konnten nicht mitgeteilt werden (z.B. zu viele Dateien) – PDF allein teilen
+      btn.textContent = '📤 Jetzt zum Teilen antippen';
+      btn.disabled = false;
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'Montagerapport',
+            text: `Montagerapport vom ${datum}${kunde ? ' – ' + kunde : ''}`
+          });
+          resetButton();
+        } catch (shareErr) {
+          if (shareErr && shareErr.name === 'AbortError') {
+            btn.disabled = false;
+          } else {
+            downloadInstead('Direktes Teilen hat nicht geklappt. Die PDF wurde stattdessen heruntergeladen – bitte manuell an eine E-Mail anhängen.');
+            resetButton();
+          }
+        }
+      };
     } else {
       downloadInstead('Direktes Teilen wird von diesem Browser nicht unterstützt. Die PDF wurde stattdessen heruntergeladen – bitte manuell an eine E-Mail anhängen.');
       resetButton();
     }
+  }
+
+  // Fotos aus der Vorschau als eigenständige Dateien einsammeln, damit sie
+  // zusätzlich zur PDF im Teilen-Menü angehängt werden können.
+  async function collectPhotoFiles() {
+    const imgs = Array.from(document.querySelectorAll('.foto-preview-item img'));
+    const files = [];
+    for (let i = 0; i < imgs.length; i++) {
+      try {
+        const res = await fetch(imgs[i].src);
+        const blob = await res.blob();
+        const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+        files.push(new File([blob], `Foto_${i + 1}.${ext}`, { type: blob.type || 'image/jpeg' }));
+      } catch (e) {
+        console.error('Foto konnte nicht als Anhang vorbereitet werden', e);
+      }
+    }
+    return files;
   }
 
   // Formular zurücksetzen
