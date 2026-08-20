@@ -1497,6 +1497,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         }
       });
 
+      // Sicherstellen, dass alle (geklonten) Fotos vollständig dekodiert sind,
+      // bevor html2canvas sie erfasst – sonst kann die Aufnahme auf manchen
+      // Geräten mitten im Laden eines Bildes "stolpern".
+      const cloneImgs = Array.from(clone.querySelectorAll('img'));
+      await Promise.all(cloneImgs.map(img => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        if (img.decode) return img.decode().catch(() => {});
+        return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+      }));
+
       // Blöcke ermitteln, die beim Seitenumbruch nicht zerschnitten werden dürfen
       // (Kopfbereich + jede Rapport-Sektion), Position relativ zur Kartenoberkante
       const blockEls = [
@@ -1508,11 +1518,26 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       const cardHeightPx = cardRectBefore.height;
       const blockBottomsPx = blockEls.map(el => el.getBoundingClientRect().bottom - cardRectBefore.top);
 
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff'
-      });
+      // Bei vielen Fotos wird die Aufnahme sehr groß (hoher Speicherbedarf) –
+      // auf iOS kann das sonst zu einem ungültigen Canvas-Zustand führen.
+      // Auflösung deshalb an die Foto-Anzahl anpassen.
+      const fotoCount = clone.querySelectorAll('.foto-preview-item').length;
+      const captureScale = fotoCount > 8 ? 1 : (fotoCount > 4 ? 1.5 : 2);
+
+      let canvas;
+      try {
+        canvas = await html2canvas(clone, {
+          scale: captureScale,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
+      } catch (captureErr) {
+        throw new Error('Screenshot der Karte fehlgeschlagen (' + (captureErr && captureErr.message) + ')');
+      }
+
+      if (!canvas || !canvas.width || !canvas.height) {
+        throw new Error('Screenshot der Karte ergab ein leeres Bild.');
+      }
 
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -1552,14 +1577,19 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         const sliceStartPx = Math.round(pageStart * pxPerMm);
         const sliceHeightPx = Math.max(1, Math.round(sliceHeightMm * pxPerMm));
 
-        const sliceCanvas = document.createElement('canvas');
-        sliceCanvas.width = canvas.width;
-        sliceCanvas.height = sliceHeightPx;
-        const sctx = sliceCanvas.getContext('2d');
-        sctx.fillStyle = '#ffffff';
-        sctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-        sctx.drawImage(canvas, 0, sliceStartPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
+        let sliceData;
+        try {
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = canvas.width;
+          sliceCanvas.height = sliceHeightPx;
+          const sctx = sliceCanvas.getContext('2d');
+          sctx.fillStyle = '#ffffff';
+          sctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+          sctx.drawImage(canvas, 0, sliceStartPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+          sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
+        } catch (sliceErr) {
+          throw new Error('Seiten-Zuschnitt fehlgeschlagen (' + (sliceErr && sliceErr.message) + ')');
+        }
 
         if (!firstPage) pdf.addPage();
         firstPage = false;
@@ -1719,7 +1749,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       btn.textContent = EXPORT_BTN_LABEL;
       if (err && err.name !== 'AbortError') {
         console.error(err);
-        alert('Beim Erstellen der PDF ist ein Fehler aufgetreten: ' + err.message);
+        const detail = (err && err.name ? err.name + ': ' : '') + (err && err.message ? err.message : String(err));
+        alert('Beim Erstellen der PDF ist ein Fehler aufgetreten:\n' + detail + '\n\nBitte davon einen Screenshot machen, das hilft beim Beheben.');
       }
       return;
     }
