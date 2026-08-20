@@ -1460,7 +1460,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     sandbox.className = 'pdf-export-sandbox';
     sandbox.style.position = 'fixed';
     sandbox.style.top = '0';
-    sandbox.style.left = '-99999px';
+    // -9999px statt eines extremeren Wertes: iOS Safari behandelt Elemente,
+    // die sehr weit außerhalb des Bildschirms liegen, teils so, als hätten
+    // sie keine gültige Layout-/Canvas-Größe ("InvalidStateError" beim
+    // Kopieren der Unterschrift-Canvas). -9999px ist der gängige, sichere Wert.
+    sandbox.style.left = '-9999px';
     sandbox.style.width = original.offsetWidth + 'px';
 
     const clone = original.cloneNode(true);
@@ -1483,10 +1487,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       const cloneCanvases = clone.querySelectorAll('canvas');
       origCanvases.forEach((c, i) => {
         const target = cloneCanvases[i];
-        if (!target) return;
-        target.width = c.width;
-        target.height = c.height;
-        target.getContext('2d').drawImage(c, 0, 0);
+        if (!target || !c.width || !c.height) return;
+        try {
+          target.width = c.width;
+          target.height = c.height;
+          target.getContext('2d').drawImage(c, 0, 0);
+        } catch (copyErr) {
+          console.error('Unterschrift/Canvas konnte nicht kopiert werden', copyErr);
+        }
       });
 
       // Blöcke ermitteln, die beim Seitenumbruch nicht zerschnitten werden dürfen
