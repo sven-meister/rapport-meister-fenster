@@ -1532,7 +1532,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           backgroundColor: '#ffffff'
         });
       } catch (captureErr) {
-        throw new Error('Screenshot der Karte fehlgeschlagen (' + (captureErr && captureErr.message) + ')');
+        throw new Error('Screenshot der Karte fehlgeschlagen (' + (captureErr && captureErr.name ? captureErr.name + ': ' : '') + (captureErr && captureErr.message) + ')');
       }
 
       if (!canvas || !canvas.width || !canvas.height) {
@@ -1577,7 +1577,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         const sliceStartPx = Math.round(pageStart * pxPerMm);
         const sliceHeightPx = Math.max(1, Math.round(sliceHeightMm * pxPerMm));
 
-        let sliceData;
         try {
           const sliceCanvas = document.createElement('canvas');
           sliceCanvas.width = canvas.width;
@@ -1586,14 +1585,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           sctx.fillStyle = '#ffffff';
           sctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
           sctx.drawImage(canvas, 0, sliceStartPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-          sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
-        } catch (sliceErr) {
-          throw new Error('Seiten-Zuschnitt fehlgeschlagen (' + (sliceErr && sliceErr.message) + ')');
-        }
+          const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
 
-        if (!firstPage) pdf.addPage();
-        firstPage = false;
-        pdf.addImage(sliceData, 'JPEG', 0, 0, imgWidth, sliceHeightMm);
+          if (!firstPage) pdf.addPage();
+          firstPage = false;
+          pdf.addImage(sliceData, 'JPEG', 0, 0, imgWidth, sliceHeightMm);
+        } catch (sliceErr) {
+          throw new Error('Seite ' + (Math.floor(pageStart / pageHeight) + 1) + ' konnte nicht erzeugt werden (' + (sliceErr && sliceErr.name ? sliceErr.name + ': ' : '') + (sliceErr && sliceErr.message) + ')');
+        }
         pageStart = breakAt;
       }
 
@@ -1601,7 +1600,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       const kunde = (document.getElementById('kundenname').value || '').trim();
       const safeKunde = kunde ? '_' + kunde.replace(/[^a-zA-Z0-9äöüÄÖÜß]+/g, '-') : '';
       const filename = `Montagerapport_${datum}${safeKunde}.pdf`;
-      const blob = pdf.output('blob');
+
+      let blob;
+      try {
+        blob = pdf.output('blob');
+      } catch (outputErr) {
+        throw new Error('PDF-Ausgabe fehlgeschlagen (' + (outputErr && outputErr.name ? outputErr.name + ': ' : '') + (outputErr && outputErr.message) + ')');
+      }
 
       return { blob, filename, datum, kunde };
     } finally {
