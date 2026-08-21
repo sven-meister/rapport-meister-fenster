@@ -537,8 +537,8 @@
 
     .foto-preview {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
       align-items: start;
     }
 
@@ -618,8 +618,8 @@
   body.pdf-export-mode .foto-preview,
   .pdf-export-sandbox .foto-preview {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
     align-items: start;
   }
 
@@ -1465,11 +1465,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     try {
       const card = document.querySelector('.card');
 
-      // Blöcke ermitteln, die beim Seitenumbruch nicht zerschnitten werden dürfen
-      // (Kopfbereich + jede Rapport-Sektion), Position relativ zur Kartenoberkante
+      // Blöcke ermitteln, die beim Seitenumbruch nicht zerschnitten werden dürfen.
+      // Neben den Sektionen selbst zählen auch einzelne Fotos, Tabellenzeilen und
+      // Unterschriftsfelder dazu – sonst wird z.B. mitten in ein Foto geschnitten,
+      // wenn die ganze "Fotos"-Sektion nicht mehr auf eine Seite passt.
       const blockEls = [
         document.querySelector('.rapport-header'),
-        ...document.querySelectorAll('.rapport-body > .section')
+        ...document.querySelectorAll('.rapport-body > .section'),
+        ...document.querySelectorAll('.foto-preview-item'),
+        ...document.querySelectorAll('.stunden-table tbody tr'),
+        ...document.querySelectorAll('.material-table tbody tr'),
+        ...document.querySelectorAll('.sig-box')
       ].filter(Boolean);
 
       const cardRectBefore = card.getBoundingClientRect();
@@ -1495,7 +1501,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       const mmPerPx = imgHeight / cardHeightPx;
       const breakPointsMm = blockBottomsPx
         .map(px => px * mmPerPx)
-        .filter(mm => mm > 0 && mm <= imgHeight);
+        .filter(mm => mm > 0 && mm <= imgHeight)
+        // Nach Position sortieren: blockEls enthält verschachtelte Elemente
+        // (Fotos/Zeilen liegen im DOM nach ihrer Sektion) – ohne Sortierung
+        // würde nicht zuverlässig der unterste passende Umbruchpunkt gewählt.
+        .sort((a, b) => a - b);
 
       let pageStart = 0;
       let firstPage = true;
