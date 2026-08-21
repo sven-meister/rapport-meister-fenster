@@ -1319,7 +1319,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         if (!drawing) return;
         e.preventDefault();
         drawing = false;
-        scheduleBackgroundPdfBuild();
       }
 
       canvas.addEventListener('mousedown', startDraw);
@@ -1338,7 +1337,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   function removeRow(button) {
     const tr = button.closest('tr');
     if (tr) tr.remove();
-    scheduleBackgroundPdfBuild();
   }
 
   // Arbeitsstunden-Zeile hinzufügen
@@ -1354,7 +1352,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
     `;
     tbody.appendChild(tr);
-    scheduleBackgroundPdfBuild();
   }
 
   // Material-Zeile hinzufügen
@@ -1369,7 +1366,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
     `;
     tbody.appendChild(tr);
-    scheduleBackgroundPdfBuild();
   }
 
   // Fotos verarbeiten & Vorschau anzeigen
@@ -1389,7 +1385,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           <button class="remove-foto" type="button" onclick="removeFotoPreview(this)">×</button>
         `;
         preview.appendChild(div);
-        scheduleBackgroundPdfBuild();
       };
 
       // Fotos werden verkleinert/komprimiert, bevor sie im Formular landen –
@@ -1406,7 +1401,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   function removeFotoPreview(button) {
     const item = button.closest('.foto-preview-item');
     if (item) item.remove();
-    scheduleBackgroundPdfBuild();
   }
 
   function resizeImageFile(file, maxDim, quality) {
@@ -1449,95 +1443,44 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   }
 
 
-  // PDF in einer unsichtbaren Sandbox erzeugen (Klon der Karte, off-screen),
-  // damit weder die Live-Ansicht kurz "umspringt" noch der Nutzer beim Tippen
-  // gestört wird – wichtig, weil dieselbe Funktion auch im Hintergrund läuft,
-  // während das Formular ausgefüllt wird.
-  async function buildPdf() {
-    const original = document.querySelector('.card');
+  // PDF erzeugen und über das Teilen-Menü versenden (z.B. per Mail mit Anhang)
+  //
+  // iOS erlaubt navigator.share() nur, wenn der Aufruf zeitlich nah an einer
+  // echten Nutzer-Interaktion (Tap) erfolgt. Die PDF-Erstellung braucht aber
+  // spürbar Zeit (html2canvas + Seitenaufteilung), wodurch diese "Aktivierung"
+  // oft schon abgelaufen ist. Statt das unzuverlässig zu erraten, läuft der
+  // Export deshalb bewusst und immer in zwei Schritten ab: 1) PDF erzeugen,
+  // 2) ein zweiter, frischer Tap auf "Jetzt zum Teilen antippen" löst das
+  // Teilen-Menü ohne jede Verzögerung aus – das funktioniert zuverlässig.
+  const EXPORT_BTN_LABEL = '📤 Als PDF per Mail senden';
 
-    const sandbox = document.createElement('div');
-    sandbox.className = 'pdf-export-sandbox';
-    sandbox.style.position = 'fixed';
-    sandbox.style.top = '0';
-    // -9999px statt eines extremeren Wertes: iOS Safari behandelt Elemente,
-    // die sehr weit außerhalb des Bildschirms liegen, teils so, als hätten
-    // sie keine gültige Layout-/Canvas-Größe ("InvalidStateError" beim
-    // Kopieren der Unterschrift-Canvas). -9999px ist der gängige, sichere Wert.
-    sandbox.style.left = '-9999px';
-    sandbox.style.width = original.offsetWidth + 'px';
+  async function exportAndShare() {
+    const btn = document.getElementById('export-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ PDF wird erstellt…';
+    document.body.classList.add('pdf-export-mode');
 
-    const clone = original.cloneNode(true);
-    sandbox.appendChild(clone);
-    document.body.appendChild(sandbox);
+    let blob, filename, datum, kunde;
 
     try {
-      // Aktuelle Werte von Eingabefeldern übertragen (cloneNode kopiert keine
-      // live gesetzten .value-Properties) und Unterschriften-Canvas-Inhalte kopieren.
-      const origFields = original.querySelectorAll('input, textarea, select');
-      const cloneFields = clone.querySelectorAll('input, textarea, select');
-      origFields.forEach((el, i) => {
-        const c = cloneFields[i];
-        if (!c) return;
-        if (el.type === 'checkbox' || el.type === 'radio') c.checked = el.checked;
-        else c.value = el.value;
-      });
-
-      const origCanvases = original.querySelectorAll('canvas');
-      const cloneCanvases = clone.querySelectorAll('canvas');
-      origCanvases.forEach((c, i) => {
-        const target = cloneCanvases[i];
-        if (!target || !c.width || !c.height) return;
-        try {
-          target.width = c.width;
-          target.height = c.height;
-          target.getContext('2d').drawImage(c, 0, 0);
-        } catch (copyErr) {
-          console.error('Unterschrift/Canvas konnte nicht kopiert werden', copyErr);
-        }
-      });
-
-      // Sicherstellen, dass alle (geklonten) Fotos vollständig dekodiert sind,
-      // bevor html2canvas sie erfasst – sonst kann die Aufnahme auf manchen
-      // Geräten mitten im Laden eines Bildes "stolpern".
-      const cloneImgs = Array.from(clone.querySelectorAll('img'));
-      await Promise.all(cloneImgs.map(img => {
-        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-        if (img.decode) return img.decode().catch(() => {});
-        return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
-      }));
+      const card = document.querySelector('.card');
 
       // Blöcke ermitteln, die beim Seitenumbruch nicht zerschnitten werden dürfen
       // (Kopfbereich + jede Rapport-Sektion), Position relativ zur Kartenoberkante
       const blockEls = [
-        clone.querySelector('.rapport-header'),
-        ...clone.querySelectorAll('.rapport-body > .section')
+        document.querySelector('.rapport-header'),
+        ...document.querySelectorAll('.rapport-body > .section')
       ].filter(Boolean);
 
-      const cardRectBefore = clone.getBoundingClientRect();
+      const cardRectBefore = card.getBoundingClientRect();
       const cardHeightPx = cardRectBefore.height;
       const blockBottomsPx = blockEls.map(el => el.getBoundingClientRect().bottom - cardRectBefore.top);
 
-      // Bei vielen Fotos wird die Aufnahme sehr groß (hoher Speicherbedarf) –
-      // auf iOS kann das sonst zu einem ungültigen Canvas-Zustand führen.
-      // Auflösung deshalb an die Foto-Anzahl anpassen.
-      const fotoCount = clone.querySelectorAll('.foto-preview-item').length;
-      const captureScale = fotoCount > 8 ? 1 : (fotoCount > 4 ? 1.5 : 2);
-
-      let canvas;
-      try {
-        canvas = await html2canvas(clone, {
-          scale: captureScale,
-          useCORS: true,
-          backgroundColor: '#ffffff'
-        });
-      } catch (captureErr) {
-        throw new Error('Screenshot der Karte fehlgeschlagen (' + (captureErr && captureErr.name ? captureErr.name + ': ' : '') + (captureErr && captureErr.message) + ')');
-      }
-
-      if (!canvas || !canvas.width || !canvas.height) {
-        throw new Error('Screenshot der Karte ergab ein leeres Bild.');
-      }
+      const canvas = await html2canvas(card, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
 
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -1577,82 +1520,39 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
         const sliceStartPx = Math.round(pageStart * pxPerMm);
         const sliceHeightPx = Math.max(1, Math.round(sliceHeightMm * pxPerMm));
 
-        try {
-          const sliceCanvas = document.createElement('canvas');
-          sliceCanvas.width = canvas.width;
-          sliceCanvas.height = sliceHeightPx;
-          const sctx = sliceCanvas.getContext('2d');
-          sctx.fillStyle = '#ffffff';
-          sctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-          sctx.drawImage(canvas, 0, sliceStartPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-          const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceHeightPx;
+        const sctx = sliceCanvas.getContext('2d');
+        sctx.fillStyle = '#ffffff';
+        sctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        sctx.drawImage(canvas, 0, sliceStartPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
 
-          if (!firstPage) pdf.addPage();
-          firstPage = false;
-          pdf.addImage(sliceData, 'JPEG', 0, 0, imgWidth, sliceHeightMm);
-        } catch (sliceErr) {
-          throw new Error('Seite ' + (Math.floor(pageStart / pageHeight) + 1) + ' konnte nicht erzeugt werden (' + (sliceErr && sliceErr.name ? sliceErr.name + ': ' : '') + (sliceErr && sliceErr.message) + ')');
-        }
+        if (!firstPage) pdf.addPage();
+        firstPage = false;
+        pdf.addImage(sliceData, 'JPEG', 0, 0, imgWidth, sliceHeightMm);
         pageStart = breakAt;
       }
 
-      const datum = document.getElementById('datum').value || new Date().toISOString().slice(0, 10);
-      const kunde = (document.getElementById('kundenname').value || '').trim();
+      datum = document.getElementById('datum').value || new Date().toISOString().slice(0, 10);
+      kunde = (document.getElementById('kundenname').value || '').trim();
       const safeKunde = kunde ? '_' + kunde.replace(/[^a-zA-Z0-9äöüÄÖÜß]+/g, '-') : '';
-      const filename = `Montagerapport_${datum}${safeKunde}.pdf`;
-
-      let blob;
-      try {
-        blob = pdf.output('blob');
-      } catch (outputErr) {
-        throw new Error('PDF-Ausgabe fehlgeschlagen (' + (outputErr && outputErr.name ? outputErr.name + ': ' : '') + (outputErr && outputErr.message) + ')');
+      filename = `Montagerapport_${datum}${safeKunde}.pdf`;
+      blob = pdf.output('blob');
+    } catch (err) {
+      document.body.classList.remove('pdf-export-mode');
+      btn.disabled = false;
+      btn.textContent = EXPORT_BTN_LABEL;
+      if (err && err.name !== 'AbortError') {
+        console.error(err);
+        alert('Beim Erstellen der PDF ist ein Fehler aufgetreten: ' + err.message);
       }
-
-      return { blob, filename, datum, kunde };
-    } finally {
-      sandbox.remove();
+      return;
     }
-  }
 
-  // Hintergrund-Vorbereitung: Während das Formular ausgefüllt wird, wird die
-  // PDF automatisch (mit kurzer Verzögerung nach der letzten Änderung) im
-  // Hintergrund neu gebaut. Ist beim Tap auf "Senden" schon eine aktuelle PDF
-  // fertig, reicht ein einziger Tap zum Teilen. Ist keine aktuelle PDF bereit
-  // (z.B. direkt nach einer Änderung), wird live gebaut – dafür bewusst und
-  // zuverlässig der bewährte zweite Tap verwendet, statt das unsicher zu raten.
-  let cachedPdf = null;
-  let pdfDirty = true;
-  let pdfBuildInFlight = false;
-  let pdfBuildTimer = null;
+    document.body.classList.remove('pdf-export-mode');
 
-  function scheduleBackgroundPdfBuild() {
-    pdfDirty = true;
-    if (pdfBuildTimer) clearTimeout(pdfBuildTimer);
-    pdfBuildTimer = setTimeout(runBackgroundPdfBuild, 900);
-  }
-
-  async function runBackgroundPdfBuild() {
-    if (pdfBuildInFlight) return;
-    pdfBuildInFlight = true;
-    pdfDirty = false;
-    try {
-      cachedPdf = await buildPdf();
-    } catch (e) {
-      cachedPdf = null;
-      console.error('Hintergrund-PDF-Erstellung fehlgeschlagen', e);
-    } finally {
-      pdfBuildInFlight = false;
-      if (pdfDirty) {
-        scheduleBackgroundPdfBuild();
-      }
-    }
-  }
-
-  const EXPORT_BTN_LABEL = '📤 Als PDF per Mail senden';
-
-  // Teilt eine fertige PDF (bzw. bietet bei Bedarf den zweiten Tap dafür an).
-  async function finishExport(btn, pdfResult, attemptImmediately) {
-    const { blob, filename, datum, kunde } = pdfResult;
     const file = new File([blob], filename, { type: 'application/pdf' });
     const photoFiles = collectPhotoFiles();
     const shareFiles = [file, ...photoFiles];
@@ -1693,13 +1593,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       filesToUse = [file];
     }
 
-    if (!filesToUse) {
-      downloadInstead('Direktes Teilen wird von diesem Browser nicht unterstützt. Die PDF wurde stattdessen heruntergeladen – bitte manuell an eine E-Mail anhängen.');
-      resetButton();
-      return;
-    }
-
-    const offerRetry = () => {
+    if (filesToUse) {
+      // Bewusst immer der zweite, frische Tap: zuverlässig statt unsicher.
       btn.textContent = '📤 Jetzt zum Teilen antippen';
       btn.disabled = false;
       btn.onclick = async () => {
@@ -1714,53 +1609,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
           resetButton();
         }
       };
-    };
-
-    if (attemptImmediately) {
-      const result = await attemptShare(filesToUse);
-      if (result === 'success') { resetButton(); return; }
-      if (result === 'aborted') { btn.disabled = false; return; }
-      // Sofort-Versuch hat's zeitlich nicht geschafft -> zuverlässiger zweiter Tap
-      offerRetry();
     } else {
-      // Bewusst immer der zweite, frische Tap: zuverlässig statt unsicher.
-      offerRetry();
+      downloadInstead('Direktes Teilen wird von diesem Browser nicht unterstützt. Die PDF wurde stattdessen heruntergeladen – bitte manuell an eine E-Mail anhängen.');
+      resetButton();
     }
-  }
-
-  async function exportAndShare() {
-    const btn = document.getElementById('export-btn');
-
-    // Fall 1: Im Hintergrund liegt schon eine aktuelle PDF bereit -> sofort
-    // versuchen zu teilen, das reicht dann mit einem einzigen Tap.
-    if (cachedPdf && !pdfDirty && !pdfBuildInFlight) {
-      btn.disabled = true;
-      await finishExport(btn, cachedPdf, true);
-      return;
-    }
-
-    // Fall 2: Keine aktuelle PDF bereit -> jetzt bauen, danach zuverlässig
-    // der zweite Tap zum Teilen.
-    btn.disabled = true;
-    btn.textContent = '⏳ PDF wird erstellt…';
-
-    let pdfResult;
-    try {
-      pdfResult = await buildPdf();
-      cachedPdf = pdfResult;
-      pdfDirty = false;
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = EXPORT_BTN_LABEL;
-      if (err && err.name !== 'AbortError') {
-        console.error(err);
-        const detail = (err && err.name ? err.name + ': ' : '') + (err && err.message ? err.message : String(err));
-        alert('Beim Erstellen der PDF ist ein Fehler aufgetreten:\n' + detail + '\n\nBitte davon einen Screenshot machen, das hilft beim Beheben.');
-      }
-      return;
-    }
-
-    await finishExport(btn, pdfResult, false);
   }
 
   // Fotos aus der Vorschau als eigenständige Dateien einsammeln, damit sie
@@ -1810,23 +1662,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
     clearSig('sig-monteur');
     clearSig('sig-kunde');
-
-    // Gecachte PDF verwerfen, sie spiegelt sonst den alten (nicht zurückgesetzten) Stand wider.
-    cachedPdf = null;
-    pdfDirty = true;
-    if (pdfBuildTimer) clearTimeout(pdfBuildTimer);
   }
-
-  // Eingaben in Textfeldern/Tabellen lösen automatisch eine Hintergrund-
-  // Aktualisierung der PDF aus (per Event-Delegation, deckt auch später
-  // hinzugefügte Stunden-/Material-Zeilen ab).
-  document.addEventListener('DOMContentLoaded', () => {
-    const body = document.querySelector('.rapport-body');
-    if (body) {
-      body.addEventListener('input', scheduleBackgroundPdfBuild);
-      body.addEventListener('change', scheduleBackgroundPdfBuild);
-    }
-  });
 </script>
 
 </body>
