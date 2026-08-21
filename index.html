@@ -214,8 +214,9 @@
     min-width: 0;
     border: 1.5px solid #ddd;
     border-radius: 4px;
-    padding: 4px 4px;
-    font-size: 11px;
+    padding: 7px 4px;
+    font-size: 12px;
+    line-height: 1.3;
     font-family: inherit;
     color: #333;
     background: #fff;
@@ -582,6 +583,15 @@
     .remove-row-btn { display: none; }
     .remove-day-btn { display: none; }
 
+    /* Die Aktion/Entfernen-Spalte (immer die letzte) wird beim Export komplett
+       ausgeblendet, nicht nur ihre Buttons – sie ist im fertigen PDF nutzlos. */
+    .stunden-table th:last-child,
+    .stunden-table td:last-child,
+    .material-table th:last-child,
+    .material-table td:last-child {
+      display: none;
+    }
+
     /* Damit die Stunden-Tabelle bei vielen Tagen nicht über die Seite hinausläuft,
        sondern die Spalten stattdessen gleichmässig schmaler werden. */
     .stunden-table-scroll { overflow: visible; }
@@ -665,6 +675,19 @@
   .pdf-export-sandbox .remove-row-btn { display: none; }
   body.pdf-export-mode .remove-day-btn,
   .pdf-export-sandbox .remove-day-btn { display: none; }
+
+  /* Die Aktion/Entfernen-Spalte (immer die letzte) wird beim Export komplett
+     ausgeblendet, nicht nur ihre Buttons – sie ist im fertigen PDF nutzlos. */
+  body.pdf-export-mode .stunden-table th:last-child,
+  body.pdf-export-mode .stunden-table td:last-child,
+  body.pdf-export-mode .material-table th:last-child,
+  body.pdf-export-mode .material-table td:last-child,
+  .pdf-export-sandbox .stunden-table th:last-child,
+  .pdf-export-sandbox .stunden-table td:last-child,
+  .pdf-export-sandbox .material-table th:last-child,
+  .pdf-export-sandbox .material-table td:last-child {
+    display: none;
+  }
 
   /* Damit die Stunden-Tabelle bei vielen Tagen nicht über die Seite hinausläuft,
      sondern die Spalten stattdessen gleichmässig schmaler werden. */
@@ -806,7 +829,7 @@
                   <button type="button" class="remove-day-btn" onclick="removeStundenDay(this)" title="Tag entfernen">×</button>
                 </div>
               </th>
-              <th class="stunden-action-col">Aktion</th>
+              <th class="stunden-action-col">Entfernen</th>
             </tr>
           </thead>
           <tbody id="stunden-tbody">
@@ -833,7 +856,7 @@
             <th style="width:46%">Bezeichnung</th>
             <th style="width:20%">Menge</th>
             <th style="width:24%">Einheit / Bemerkung</th>
-            <th style="width:10%">Aktion</th>
+            <th style="width:10%">Entfernen</th>
           </tr>
         </thead>
         <tbody id="material-tbody">
