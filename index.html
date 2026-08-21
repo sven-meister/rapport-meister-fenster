@@ -717,18 +717,16 @@
       <table class="stunden-table">
         <thead>
           <tr>
-            <th style="width:30%">Mitarbeiter</th>
-            <th style="width:18%">Von</th>
-            <th style="width:18%">Bis</th>
-            <th style="width:24%">Total Stunden</th>
-            <th style="width:10%">Aktion</th>
+            <th style="width:32%">Mitarbeiter</th>
+            <th style="width:26%">Datum</th>
+            <th style="width:27%">Stunden</th>
+            <th style="width:15%">Aktion</th>
           </tr>
         </thead>
         <tbody id="stunden-tbody">
           <tr>
             <td><input type="text" placeholder="Name"></td>
-            <td><input type="time"></td>
-            <td><input type="time"></td>
+            <td><input type="date"></td>
             <td><input type="text" placeholder="z.B. 8.5 h"></td>
             <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
           </tr>
@@ -1346,8 +1344,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input type="text" placeholder="Name"></td>
-      <td><input type="time"></td>
-      <td><input type="time"></td>
+      <td><input type="date"></td>
       <td><input type="text" placeholder="z.B. 8.5 h"></td>
       <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
     `;
