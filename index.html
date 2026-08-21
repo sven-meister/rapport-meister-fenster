@@ -209,7 +209,7 @@
     gap: 4px;
   }
 
-  .day-col-head input[type="date"] {
+  .day-col-head input {
     flex: 1;
     min-width: 0;
     border: 1.5px solid #ddd;
@@ -1587,6 +1587,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   // Teilen-Menü ohne jede Verzögerung aus – das funktioniert zuverlässig.
   const EXPORT_BTN_LABEL = '📤 Als PDF per Mail senden';
 
+  // "JJJJ-MM-TT" (Wert von <input type="date">) ins Schweizer Format TT.MM.JJJJ
+  function formatDateSwiss(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    if (!m) return '';
+    return `${m[3]}.${m[2]}.${m[1]}`;
+  }
+
   async function exportAndShare() {
     const btn = document.getElementById('export-btn');
     btn.disabled = true;
@@ -1615,11 +1622,31 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       const cardHeightPx = cardRectBefore.height;
       const blockBottomsPx = blockEls.map(el => el.getBoundingClientRect().bottom - cardRectBefore.top);
 
-      const canvas = await html2canvas(card, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff'
+      // Datumsfelder zeigen auf dem Bildschirm zwar das native Schweizer Format
+      // (TT.MM.JJJJ) an, html2canvas erfasst beim Screenshot aber oft nur den
+      // internen Rohwert (JJJJ-MM-TT). Deshalb kurz auf ein reines Textfeld mit
+      // formatiertem Wert umstellen, Screenshot machen, danach zurücksetzen.
+      const dateInputs = Array.from(card.querySelectorAll('input[type="date"]'));
+      const dateInputBackup = dateInputs.map(el => ({ el, value: el.value }));
+      dateInputs.forEach(el => {
+        const formatted = formatDateSwiss(el.value);
+        el.type = 'text';
+        el.value = formatted;
       });
+
+      let canvas;
+      try {
+        canvas = await html2canvas(card, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
+      } finally {
+        dateInputBackup.forEach(({ el, value }) => {
+          el.type = 'date';
+          el.value = value;
+        });
+      }
 
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -1699,7 +1726,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     const file = new File([blob], filename, { type: 'application/pdf' });
     const photoFiles = collectPhotoFiles();
     const shareFiles = [file, ...photoFiles];
-    const shareText = `Montagerapport vom ${datum}${kunde ? ' – ' + kunde : ''}`;
+    const shareText = `Montagerapport vom ${formatDateSwiss(datum) || datum}${kunde ? ' – ' + kunde : ''}`;
 
     const downloadInstead = (hint) => {
       const url = URL.createObjectURL(blob);
