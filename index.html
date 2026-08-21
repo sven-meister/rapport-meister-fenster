@@ -193,6 +193,67 @@
     border-radius: 3px;
   }
 
+  /* Horizontales Scrollen, falls viele Tage nebeneinander stehen */
+  .stunden-table-scroll {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .stunden-name-col { width: 140px; min-width: 120px; }
+  .stunden-day-col { min-width: 108px; }
+  .stunden-action-col { width: 56px; }
+
+  .day-col-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .day-col-head input[type="date"] {
+    flex: 1;
+    min-width: 0;
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    padding: 4px 4px;
+    font-size: 11px;
+    font-family: inherit;
+    color: #333;
+    background: #fff;
+    text-transform: none;
+    letter-spacing: normal;
+    height: auto;
+  }
+
+  .remove-day-btn {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    background: #fff;
+    color: #999;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .remove-day-btn:hover {
+    border-color: #e44;
+    color: #e44;
+  }
+
+  .stunden-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .stunden-actions .add-row-btn {
+    margin-top: 0;
+  }
+
   .add-row-btn {
     margin-top: 8px;
     background: none;
@@ -519,6 +580,13 @@
     .clear-sig { display: none; }
     .foto-upload-area { display: none; }
     .remove-row-btn { display: none; }
+    .remove-day-btn { display: none; }
+
+    /* Damit die Stunden-Tabelle bei vielen Tagen nicht über die Seite hinausläuft,
+       sondern die Spalten stattdessen gleichmässig schmaler werden. */
+    .stunden-table-scroll { overflow: visible; }
+    .stunden-table { table-layout: fixed; }
+    .stunden-day-col, .stunden-name-col { min-width: 0; width: auto; }
 
     .field input,
     .field textarea,
@@ -595,6 +663,19 @@
   .pdf-export-sandbox .foto-upload-area { display: none; }
   body.pdf-export-mode .remove-row-btn,
   .pdf-export-sandbox .remove-row-btn { display: none; }
+  body.pdf-export-mode .remove-day-btn,
+  .pdf-export-sandbox .remove-day-btn { display: none; }
+
+  /* Damit die Stunden-Tabelle bei vielen Tagen nicht über die Seite hinausläuft,
+     sondern die Spalten stattdessen gleichmässig schmaler werden. */
+  body.pdf-export-mode .stunden-table-scroll,
+  .pdf-export-sandbox .stunden-table-scroll { overflow: visible; }
+  body.pdf-export-mode .stunden-table,
+  .pdf-export-sandbox .stunden-table { table-layout: fixed; }
+  body.pdf-export-mode .stunden-day-col,
+  body.pdf-export-mode .stunden-name-col,
+  .pdf-export-sandbox .stunden-day-col,
+  .pdf-export-sandbox .stunden-name-col { min-width: 0; width: auto; }
 
   body.pdf-export-mode .field input,
   body.pdf-export-mode .field textarea,
@@ -714,25 +795,33 @@
     <!-- STUNDEN -->
     <div class="section">
       <div class="section-title">Arbeitsstunden</div>
-      <table class="stunden-table">
-        <thead>
-          <tr>
-            <th style="width:32%">Mitarbeiter</th>
-            <th style="width:26%">Datum</th>
-            <th style="width:27%">Stunden</th>
-            <th style="width:15%">Aktion</th>
-          </tr>
-        </thead>
-        <tbody id="stunden-tbody">
-          <tr>
-            <td><input type="text" placeholder="Name"></td>
-            <td><input type="date"></td>
-            <td><input type="text" placeholder="z.B. 8.5 h"></td>
-            <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
-          </tr>
-        </tbody>
-      </table>
-      <button class="add-row-btn" type="button" onclick="addStundenRow()">+ Zeile hinzufügen</button>
+      <div class="stunden-table-scroll">
+        <table class="stunden-table">
+          <thead>
+            <tr id="stunden-header-row">
+              <th class="stunden-name-col">Mitarbeiter</th>
+              <th class="stunden-day-col">
+                <div class="day-col-head">
+                  <input type="date">
+                  <button type="button" class="remove-day-btn" onclick="removeStundenDay(this)" title="Tag entfernen">×</button>
+                </div>
+              </th>
+              <th class="stunden-action-col">Aktion</th>
+            </tr>
+          </thead>
+          <tbody id="stunden-tbody">
+            <tr>
+              <td><input type="text" placeholder="Name"></td>
+              <td><input type="text" placeholder="Std."></td>
+              <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="stunden-actions">
+        <button class="add-row-btn" type="button" onclick="addStundenDay()">+ Tag hinzufügen</button>
+        <button class="add-row-btn" type="button" onclick="addStundenRow()">+ Mitarbeiter hinzufügen</button>
+      </div>
     </div>
 
     <!-- MATERIAL -->
@@ -1337,18 +1426,65 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     if (tr) tr.remove();
   }
 
-  // Arbeitsstunden-Zeile hinzufügen
+  // Arbeitsstunden: neuen Mitarbeiter (Zeile) hinzufügen – mit einer
+  // Stunden-Zelle pro aktuell vorhandenem Tag
   function addStundenRow() {
     const tbody = document.getElementById('stunden-tbody');
-    if (!tbody) return;
+    const headerRow = document.getElementById('stunden-header-row');
+    if (!tbody || !headerRow) return;
+    const dayCount = headerRow.querySelectorAll('.stunden-day-col').length;
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="text" placeholder="Name"></td>
-      <td><input type="date"></td>
-      <td><input type="text" placeholder="z.B. 8.5 h"></td>
-      <td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>
-    `;
+    let cells = '<td><input type="text" placeholder="Name"></td>';
+    for (let i = 0; i < dayCount; i++) {
+      cells += '<td><input type="text" placeholder="Std."></td>';
+    }
+    cells += '<td><button type="button" class="remove-row-btn" onclick="removeRow(this)">–</button></td>';
+    tr.innerHTML = cells;
     tbody.appendChild(tr);
+  }
+
+  // Arbeitsstunden: neuen Tag (Spalte) hinzufügen – für jede bestehende
+  // Mitarbeiter-Zeile wird passend eine neue Stunden-Zelle ergänzt
+  function addStundenDay() {
+    const headerRow = document.getElementById('stunden-header-row');
+    const tbody = document.getElementById('stunden-tbody');
+    if (!headerRow || !tbody) return;
+
+    const actionTh = headerRow.querySelector('.stunden-action-col');
+    const th = document.createElement('th');
+    th.className = 'stunden-day-col';
+    th.innerHTML = `
+      <div class="day-col-head">
+        <input type="date">
+        <button type="button" class="remove-day-btn" onclick="removeStundenDay(this)" title="Tag entfernen">×</button>
+      </div>
+    `;
+    headerRow.insertBefore(th, actionTh);
+
+    tbody.querySelectorAll('tr').forEach(tr => {
+      const actionTd = tr.querySelector('td:last-child');
+      const td = document.createElement('td');
+      td.innerHTML = '<input type="text" placeholder="Std.">';
+      tr.insertBefore(td, actionTd);
+    });
+  }
+
+  // Arbeitsstunden: einen Tag (Spalte) inkl. aller zugehörigen Stunden-Zellen entfernen
+  function removeStundenDay(button) {
+    const th = button.closest('th');
+    const headerRow = document.getElementById('stunden-header-row');
+    const tbody = document.getElementById('stunden-tbody');
+    if (!th || !headerRow || !tbody) return;
+
+    const ths = Array.from(headerRow.children);
+    const idx = ths.indexOf(th);
+    if (idx === -1) return;
+
+    th.remove();
+    tbody.querySelectorAll('tr').forEach(tr => {
+      const tds = tr.children;
+      if (tds[idx]) tds[idx].remove();
+    });
   }
 
   // Material-Zeile hinzufügen
