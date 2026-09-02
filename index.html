@@ -1721,13 +1721,30 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   // kurz durch ein optisch identisches <div> mit garantiertem Zeilenumbruch
   // ersetzt (das seinen Inhalt korrekt umbricht und in voller Höhe zeigt),
   // und danach wieder durch die echte Textarea ersetzt.
+  // Einzelne Eigenschaften kopieren statt cssText: getComputedStyle(...).cssText
+  // liefert auf Safari/iOS oft einen leeren String (bekannte Cross-Browser-
+  // Inconsistenz) – dann bliebe das Kästchen komplett unsichtbar. Einzelne
+  // Werte per getPropertyValue() abzufragen funktioniert dagegen überall zuverlässig.
+  const TEXTAREA_STYLE_PROPS = [
+    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+    'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+    'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+    'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius',
+    'background-color',
+    'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'font-size', 'font-family', 'font-weight', 'color', 'line-height', 'letter-spacing',
+    'width', 'box-sizing'
+  ];
+
   function autoGrowTextareas(root) {
     const textareas = Array.from((root || document).querySelectorAll('textarea'));
     const swaps = textareas.map(el => {
       const cs = getComputedStyle(el);
       const div = document.createElement('div');
       div.textContent = el.value;
-      div.style.cssText = cs.cssText;
+      TEXTAREA_STYLE_PROPS.forEach(prop => {
+        div.style.setProperty(prop, cs.getPropertyValue(prop));
+      });
       div.style.whiteSpace = 'pre-wrap';
       div.style.overflowWrap = 'break-word';
       div.style.wordBreak = 'break-word';
