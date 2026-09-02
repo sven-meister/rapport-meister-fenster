@@ -625,37 +625,18 @@
     .stunden-table { table-layout: fixed; }
     .stunden-day-col, .stunden-name-col { min-width: 0; width: auto; }
 
+    /* Felder behalten beim Drucken bewusst ihr Kästchen (Rahmen) wie beim
+       Ausfüllen am Bildschirm – nur die Schrift wird grösser. */
     .field input,
     .field textarea,
     .field select,
+    .day-col-head input,
     .stunden-table td input,
     .material-table td input {
       font-size: 15px;
     }
 
-    .field input,
-    .field textarea,
-    .field select {
-      border: none;
-      border-bottom: 1px solid #bbb;
-      border-radius: 0;
-      background: transparent;
-      padding: 4px 2px;
-      height: auto;
-    }
-
-    /* Das Datumsfeld im Stunden-Spaltenkopf soll aussehen wie alle anderen
-       Felder – sonst wirkt es beim Druck inkonsistent (einziges Feld mit
-       sichtbarem Rahmen/Hintergrund). */
     .day-col-head { padding-top: 0; }
-    .day-col-head input {
-      border: none;
-      border-bottom: 1px solid #bbb;
-      border-radius: 0;
-      background: transparent;
-      height: auto;
-      padding: 4px 2px;
-    }
 
     .sig-canvas-wrapper {
       background: transparent;
@@ -775,47 +756,25 @@
   .pdf-export-sandbox .stunden-day-col,
   .pdf-export-sandbox .stunden-name-col { min-width: 0; width: auto; }
 
+  /* Felder behalten beim Export bewusst ihr Kästchen (Rahmen) wie beim
+     Ausfüllen am Bildschirm – nur die Schrift wird grösser. */
   body.pdf-export-mode .field input,
   body.pdf-export-mode .field textarea,
   body.pdf-export-mode .field select,
+  body.pdf-export-mode .day-col-head input,
   body.pdf-export-mode .stunden-table td input,
   body.pdf-export-mode .material-table td input,
   .pdf-export-sandbox .field input,
   .pdf-export-sandbox .field textarea,
   .pdf-export-sandbox .field select,
+  .pdf-export-sandbox .day-col-head input,
   .pdf-export-sandbox .stunden-table td input,
   .pdf-export-sandbox .material-table td input {
     font-size: 15px;
   }
 
-  body.pdf-export-mode .field input,
-  body.pdf-export-mode .field textarea,
-  body.pdf-export-mode .field select,
-  .pdf-export-sandbox .field input,
-  .pdf-export-sandbox .field textarea,
-  .pdf-export-sandbox .field select {
-    border: none;
-    border-bottom: 1px solid #bbb;
-    border-radius: 0;
-    background: transparent;
-    padding: 4px 2px;
-    height: auto;
-  }
-
-  /* Das Datumsfeld im Stunden-Spaltenkopf soll aussehen wie alle anderen
-     Felder – sonst wirkt es beim Export inkonsistent (einziges Feld mit
-     sichtbarem Rahmen/Hintergrund). */
   body.pdf-export-mode .day-col-head,
   .pdf-export-sandbox .day-col-head { padding-top: 0; }
-  body.pdf-export-mode .day-col-head input,
-  .pdf-export-sandbox .day-col-head input {
-    border: none;
-    border-bottom: 1px solid #bbb;
-    border-radius: 0;
-    background: transparent;
-    height: auto;
-    padding: 4px 2px;
-  }
 
   body.pdf-export-mode .sig-canvas-wrapper,
   .pdf-export-sandbox .sig-canvas-wrapper {
@@ -1840,13 +1799,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const restorePlaceholders = hideEmptyPlaceholders(card);
 
       // Blöcke ermitteln, die beim Seitenumbruch nicht zerschnitten werden dürfen.
-      // Neben den Sektionen selbst zählen auch einzelne Fotos, Tabellenzeilen und
-      // Unterschriftsfelder dazu – sonst wird z.B. mitten in ein Foto geschnitten,
-      // wenn die ganze "Fotos"-Sektion nicht mehr auf eine Seite passt.
+      // Neben den Sektionen selbst zählen auch Tabellenzeilen und
+      // Unterschriftsfelder dazu – sonst wird z.B. mitten in eine Zeile geschnitten,
+      // wenn die ganze Sektion nicht mehr auf eine Seite passt.
       const blockEls = [
         document.querySelector('.rapport-header'),
         ...document.querySelectorAll('.rapport-body > .section'),
-        ...document.querySelectorAll('.foto-preview-item'),
         ...document.querySelectorAll('.stunden-table tbody tr'),
         ...document.querySelectorAll('.material-table tbody tr'),
         ...document.querySelectorAll('.sig-box')
@@ -1855,6 +1813,22 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const cardRectBefore = card.getBoundingClientRect();
       const cardHeightPx = cardRectBefore.height;
       const blockBottomsPx = blockEls.map(el => el.getBoundingClientRect().bottom - cardRectBefore.top);
+
+      // Fotos stehen mehrspaltig nebeneinander und können in derselben Zeile
+      // unterschiedlich hoch sein (verschiedene Seitenverhältnisse). Ein Umbruch
+      // direkt unter einem kürzeren Foto würde dann mitten durch ein höheres
+      // Nachbarfoto derselben Zeile schneiden. Deshalb gilt pro Bildzeile nur
+      // EIN Umbruchpunkt: das tiefste (unterste) Foto dieser Zeile.
+      const fotoRowBottomByTop = new Map();
+      document.querySelectorAll('.foto-preview-item').forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const rowKey = Math.round(rect.top);
+        const bottom = rect.bottom - cardRectBefore.top;
+        if (!fotoRowBottomByTop.has(rowKey) || fotoRowBottomByTop.get(rowKey) < bottom) {
+          fotoRowBottomByTop.set(rowKey, bottom);
+        }
+      });
+      const allBlockBottomsPx = [...blockBottomsPx, ...fotoRowBottomByTop.values()];
 
       // Datumsfelder zeigen auf dem Bildschirm zwar das native Schweizer Format
       // (TT.MM.JJJJ) an, html2canvas erfasst beim Screenshot aber oft nur den
@@ -1895,7 +1869,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       // Umrechnung DOM-Pixel → mm im fertigen Bild, um die Block-Grenzen
       // als mögliche (bevorzugte) Seitenumbruch-Punkte nutzen zu können
       const mmPerPx = imgHeight / cardHeightPx;
-      const breakPointsMm = blockBottomsPx
+      const breakPointsMm = allBlockBottomsPx
         .map(px => px * mmPerPx)
         .filter(mm => mm > 0 && mm <= imgHeight)
         // Nach Position sortieren: blockEls enthält verschachtelte Elemente
