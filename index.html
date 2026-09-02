@@ -572,7 +572,12 @@
 
   /* ===== PRINT / PDF ===== */
   @media print {
-    body { background: white; }
+    body { background: white; font-size: 15px; }
+
+    /* Platzhaltertexte (z.B. "z.B. A-2024-0123") sind nur Beispiele fürs
+       Ausfüllen – ein leer gebliebenes Feld soll beim Drucken auch leer
+       bleiben, statt den Hinweistext mit auszudrucken. */
+    ::placeholder { color: transparent !important; }
 
     .screen-only { padding: 0; display: block; }
 
@@ -580,6 +585,22 @@
       box-shadow: none;
       border-radius: 0;
       max-width: 100%;
+    }
+
+    /* Auf echtem A4-Papier wirkt die für den Bildschirm gedachte Schrift
+       winzig – deshalb wird beim Drucken durchgehend grösser gesetzt. */
+    .section-title { font-size: 13px; }
+    .field label { font-size: 12.5px; }
+    .rapport-title .subtitle { font-size: 13px; }
+
+    .stunden-table,
+    .material-table {
+      font-size: 15px;
+    }
+
+    .stunden-table th,
+    .material-table th {
+      font-size: 12.5px;
     }
 
     .rapport-actions { display: none; }
@@ -606,6 +627,14 @@
 
     .field input,
     .field textarea,
+    .field select,
+    .stunden-table td input,
+    .material-table td input {
+      font-size: 15px;
+    }
+
+    .field input,
+    .field textarea,
     .field select {
       border: none;
       border-bottom: 1px solid #bbb;
@@ -613,6 +642,19 @@
       background: transparent;
       padding: 4px 2px;
       height: auto;
+    }
+
+    /* Das Datumsfeld im Stunden-Spaltenkopf soll aussehen wie alle anderen
+       Felder – sonst wirkt es beim Druck inkonsistent (einziges Feld mit
+       sichtbarem Rahmen/Hintergrund). */
+    .day-col-head { padding-top: 0; }
+    .day-col-head input {
+      border: none;
+      border-bottom: 1px solid #bbb;
+      border-radius: 0;
+      background: transparent;
+      height: auto;
+      padding: 4px 2px;
     }
 
     .sig-canvas-wrapper {
@@ -669,6 +711,33 @@
     max-width: 100%;
   }
 
+  /* Auf echtem A4-Papier wirkt die für den Bildschirm gedachte Schrift
+     winzig – deshalb wird beim Export durchgehend grösser gesetzt (spiegelt
+     @media print). */
+  body.pdf-export-mode,
+  .pdf-export-sandbox { font-size: 15px; }
+
+  body.pdf-export-mode .section-title,
+  .pdf-export-sandbox .section-title { font-size: 13px; }
+  body.pdf-export-mode .field label,
+  .pdf-export-sandbox .field label { font-size: 12.5px; }
+  body.pdf-export-mode .rapport-title .subtitle,
+  .pdf-export-sandbox .rapport-title .subtitle { font-size: 13px; }
+
+  body.pdf-export-mode .stunden-table,
+  body.pdf-export-mode .material-table,
+  .pdf-export-sandbox .stunden-table,
+  .pdf-export-sandbox .material-table {
+    font-size: 15px;
+  }
+
+  body.pdf-export-mode .stunden-table th,
+  body.pdf-export-mode .material-table th,
+  .pdf-export-sandbox .stunden-table th,
+  .pdf-export-sandbox .material-table th {
+    font-size: 12.5px;
+  }
+
   body.pdf-export-mode .rapport-actions,
   .pdf-export-sandbox .rapport-actions { display: none; }
   body.pdf-export-mode .add-row-btn,
@@ -709,6 +778,19 @@
   body.pdf-export-mode .field input,
   body.pdf-export-mode .field textarea,
   body.pdf-export-mode .field select,
+  body.pdf-export-mode .stunden-table td input,
+  body.pdf-export-mode .material-table td input,
+  .pdf-export-sandbox .field input,
+  .pdf-export-sandbox .field textarea,
+  .pdf-export-sandbox .field select,
+  .pdf-export-sandbox .stunden-table td input,
+  .pdf-export-sandbox .material-table td input {
+    font-size: 15px;
+  }
+
+  body.pdf-export-mode .field input,
+  body.pdf-export-mode .field textarea,
+  body.pdf-export-mode .field select,
   .pdf-export-sandbox .field input,
   .pdf-export-sandbox .field textarea,
   .pdf-export-sandbox .field select {
@@ -718,6 +800,21 @@
     background: transparent;
     padding: 4px 2px;
     height: auto;
+  }
+
+  /* Das Datumsfeld im Stunden-Spaltenkopf soll aussehen wie alle anderen
+     Felder – sonst wirkt es beim Export inkonsistent (einziges Feld mit
+     sichtbarem Rahmen/Hintergrund). */
+  body.pdf-export-mode .day-col-head,
+  .pdf-export-sandbox .day-col-head { padding-top: 0; }
+  body.pdf-export-mode .day-col-head input,
+  .pdf-export-sandbox .day-col-head input {
+    border: none;
+    border-bottom: 1px solid #bbb;
+    border-radius: 0;
+    background: transparent;
+    height: auto;
+    padding: 4px 2px;
   }
 
   body.pdf-export-mode .sig-canvas-wrapper,
@@ -1659,6 +1756,68 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return `${m[3]}.${m[2]}.${m[1]}`;
   }
 
+  // Textareas zeigen beim Drucken/Screenshot nur ihren fest eingestellten,
+  // sichtbaren Ausschnitt und brechen längeren Text nicht zuverlässig um –
+  // der Rest wird einfach rechts abgeschnitten. Deshalb wird jede Textarea
+  // kurz durch ein optisch identisches <div> mit garantiertem Zeilenumbruch
+  // ersetzt (das seinen Inhalt korrekt umbricht und in voller Höhe zeigt),
+  // und danach wieder durch die echte Textarea ersetzt.
+  function autoGrowTextareas(root) {
+    const textareas = Array.from((root || document).querySelectorAll('textarea'));
+    const swaps = textareas.map(el => {
+      const cs = getComputedStyle(el);
+      const div = document.createElement('div');
+      div.textContent = el.value;
+      div.style.cssText = cs.cssText;
+      div.style.whiteSpace = 'pre-wrap';
+      div.style.overflowWrap = 'break-word';
+      div.style.wordBreak = 'break-word';
+      div.style.overflow = 'visible';
+      div.style.resize = 'none';
+      div.style.height = 'auto';
+      div.style.minHeight = cs.height;
+      el.style.display = 'none';
+      el.insertAdjacentElement('afterend', div);
+      return { el, div };
+    });
+    return () => {
+      swaps.forEach(({ el, div }) => {
+        div.remove();
+        el.style.display = '';
+      });
+    };
+  }
+
+  // Platzhaltertext (z.B. "z.B. A-2024-0123") ist nur ein Ausfüll-Beispiel.
+  // html2canvas erfasst beim Screenshot aber einfach, was optisch im Feld zu
+  // sehen ist – bei einem leeren Feld also den grauen Hinweistext. Deshalb
+  // wird das placeholder-Attribut leerer Felder kurz entfernt.
+  function hideEmptyPlaceholders(root) {
+    const fields = Array.from((root || document).querySelectorAll('input[placeholder], textarea[placeholder]'))
+      .filter(el => !el.value);
+    fields.forEach(el => el.dataset.placeholderBackup = el.getAttribute('placeholder'));
+    fields.forEach(el => el.removeAttribute('placeholder'));
+    return () => {
+      fields.forEach(el => {
+        el.setAttribute('placeholder', el.dataset.placeholderBackup);
+        delete el.dataset.placeholderBackup;
+      });
+    };
+  }
+
+  // Für den nativen Drucken-Button (window.print()): Textareas kurz vor dem
+  // eigentlichen Drucken aufziehen, danach wieder auf die normale Grösse zurück.
+  let restorePrintTextareas = null;
+  window.addEventListener('beforeprint', () => {
+    restorePrintTextareas = autoGrowTextareas(document.querySelector('.card'));
+  });
+  window.addEventListener('afterprint', () => {
+    if (restorePrintTextareas) {
+      restorePrintTextareas();
+      restorePrintTextareas = null;
+    }
+  });
+
   async function exportAndShare() {
     const btn = document.getElementById('export-btn');
     btn.disabled = true;
@@ -1669,6 +1828,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     try {
       const card = document.querySelector('.card');
+
+      // Textareas zeigen sonst nur ihren sichtbaren, per Hand gezogenen
+      // Ausschnitt – längerer Text würde beim Screenshot einfach abgeschnitten.
+      // Deshalb kurz auf die volle Inhaltshöhe aufziehen, danach zurücksetzen.
+      const restoreTextareas = autoGrowTextareas(card);
+
+      // Platzhaltertexte (z.B. "z.B. A-2024-0123") sind nur Beispiele fürs
+      // Ausfüllen – ein leer gebliebenes Feld soll auch leer in der PDF
+      // landen, statt den Hinweistext mit zu erfassen.
+      const restorePlaceholders = hideEmptyPlaceholders(card);
 
       // Blöcke ermitteln, die beim Seitenumbruch nicht zerschnitten werden dürfen.
       // Neben den Sektionen selbst zählen auch einzelne Fotos, Tabellenzeilen und
@@ -1707,6 +1876,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           backgroundColor: '#ffffff'
         });
       } finally {
+        restoreTextareas();
+        restorePlaceholders();
         dateInputBackup.forEach(({ el, value }) => {
           el.type = 'date';
           el.value = value;
