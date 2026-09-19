@@ -579,6 +579,15 @@
        bleiben, statt den Hinweistext mit auszudrucken. */
     ::placeholder { color: transparent !important; }
 
+    /* Vom Browser/iOS automatisch ausgefüllte Felder (z.B. Telefonnummer,
+       Namen) werden sonst bläulich eingefärbt und wirken dadurch "aktiv"/
+       hervorgehoben statt wie ein normales, fertig ausgefülltes Feld. */
+    input:-webkit-autofill,
+    textarea:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 1000px #fafafa inset !important;
+      -webkit-text-fill-color: #333 !important;
+    }
+
     .screen-only { padding: 0; display: block; }
 
     .card {
@@ -685,11 +694,27 @@
     display: block;
   }
 
+  /* Vom Browser/iOS automatisch ausgefüllte Felder (z.B. Telefonnummer,
+     Namen) werden sonst bläulich eingefärbt und wirken dadurch "aktiv"/
+     hervorgehoben statt wie ein normales, fertig ausgefülltes Feld. */
+  body.pdf-export-mode input:-webkit-autofill,
+  body.pdf-export-mode textarea:-webkit-autofill,
+  .pdf-export-sandbox input:-webkit-autofill,
+  .pdf-export-sandbox textarea:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px #fafafa inset !important;
+    -webkit-text-fill-color: #333 !important;
+  }
+
+  /* Feste Breite statt max-width:100% – sonst darf die Karte beim Export so
+     breit werden wie der jeweilige Bildschirm (z.B. iPad quer), und der Text
+     wirkt beim Herunterskalieren auf die feste A4-Breite kleiner als gedacht.
+     Eine feste Breite sorgt für eine gleichbleibende, vorhersagbare Schriftgrösse. */
   body.pdf-export-mode .card,
   .pdf-export-sandbox .card {
     box-shadow: none;
     border-radius: 0;
-    max-width: 100%;
+    width: 820px;
+    max-width: 820px;
   }
 
   /* Auf echtem A4-Papier wirkt die für den Bildschirm gedachte Schrift
@@ -1785,6 +1810,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   // eigentlichen Drucken aufziehen, danach wieder auf die normale Grösse zurück.
   let restorePrintTextareas = null;
   window.addEventListener('beforeprint', () => {
+    // Das gerade fokussierte Feld zeigt sonst seinen grünen Fokus-Rahmen mit aus.
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     restorePrintTextareas = autoGrowTextareas(document.querySelector('.card'));
   });
   window.addEventListener('afterprint', () => {
@@ -1798,6 +1825,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const btn = document.getElementById('export-btn');
     btn.disabled = true;
     btn.textContent = '⏳ PDF wird erstellt…';
+    // Das gerade fokussierte Feld zeigt sonst seinen grünen Fokus-Rahmen mit aus.
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     document.body.classList.add('pdf-export-mode');
 
     let blob, filename, datum, kunde;
