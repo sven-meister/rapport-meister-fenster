@@ -1789,6 +1789,24 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     };
   }
 
+  // Die Stunden-Zellen zeigen auf dem Bildschirm nur die reine Zahl (kompakt
+  // beim Eintippen) – im Export/Ausdruck soll aber die Einheit "Std." mit
+  // dabeistehen, damit der Wert auch ohne Tabellenkopf eindeutig lesbar ist.
+  function addStundenUnits(root) {
+    const inputs = Array.from((root || document).querySelectorAll('.stunden-table td input[placeholder="Std."]'))
+      .filter(el => el.value.trim());
+    inputs.forEach(el => {
+      el.dataset.stundenValueBackup = el.value;
+      el.value = el.value.trim() + ' Std.';
+    });
+    return () => {
+      inputs.forEach(el => {
+        el.value = el.dataset.stundenValueBackup;
+        delete el.dataset.stundenValueBackup;
+      });
+    };
+  }
+
   // Platzhaltertext (z.B. "z.B. A-2024-0123") ist nur ein Ausfüll-Beispiel.
   // html2canvas erfasst beim Screenshot aber einfach, was optisch im Feld zu
   // sehen ist – bei einem leeren Feld also den grauen Hinweistext. Deshalb
@@ -1809,15 +1827,21 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   // Für den nativen Drucken-Button (window.print()): Textareas kurz vor dem
   // eigentlichen Drucken aufziehen, danach wieder auf die normale Grösse zurück.
   let restorePrintTextareas = null;
+  let restorePrintStundenUnits = null;
   window.addEventListener('beforeprint', () => {
     // Das gerade fokussierte Feld zeigt sonst seinen grünen Fokus-Rahmen mit aus.
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     restorePrintTextareas = autoGrowTextareas(document.querySelector('.card'));
+    restorePrintStundenUnits = addStundenUnits(document.querySelector('.card'));
   });
   window.addEventListener('afterprint', () => {
     if (restorePrintTextareas) {
       restorePrintTextareas();
       restorePrintTextareas = null;
+    }
+    if (restorePrintStundenUnits) {
+      restorePrintStundenUnits();
+      restorePrintStundenUnits = null;
     }
   });
 
@@ -1843,6 +1867,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       // Ausfüllen – ein leer gebliebenes Feld soll auch leer in der PDF
       // landen, statt den Hinweistext mit zu erfassen.
       const restorePlaceholders = hideEmptyPlaceholders(card);
+
+      // Ausgefüllte Stunden-Zellen sollen im Export die Einheit "Std." mit zeigen.
+      const restoreStundenUnits = addStundenUnits(card);
 
       // Blöcke ermitteln, die beim Seitenumbruch nicht zerschnitten werden dürfen.
       // Neben den Sektionen selbst zählen auch Tabellenzeilen und
@@ -1898,6 +1925,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       } finally {
         restoreTextareas();
         restorePlaceholders();
+        restoreStundenUnits();
         dateInputBackup.forEach(({ el, value }) => {
           el.type = 'date';
           el.value = value;
